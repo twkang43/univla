@@ -18,6 +18,8 @@ from einops import rearrange, repeat
 from transformers import CLIPTextModel, CLIPTokenizer
 import torchvision
 import random
+from dataclasses import dataclass
+from typing import Sequence, Dict
 
 
 logger = logging.getLogger(__name__)
@@ -71,12 +73,13 @@ class HDF5Dataset(torch.utils.data.Dataset):
             print(f"processing {dataset_path}")
 
             with h5py.File(dataset_path, 'r') as root:
+                # TODO: Use demo_* to get data
                 compressed = root.attrs.get('compress', False)
-                original_action_shape = root['/action'].shape
+                original_action_shape = root['/actions'].shape
                 self.episode_len = original_action_shape[0]
 
-                qpos.append(np.array(root['/observations/qpos']))
-                actions.append(np.array(root['/action']))
+                qpos.append(np.array(root['/obs/joint_states']))
+                actions.append(np.array(root['/actions']))
                 
                 file_name = dataset_path.split('/')[-1]
 
@@ -85,7 +88,7 @@ class HDF5Dataset(torch.utils.data.Dataset):
                 instructions.append(task_instruction)
                 
                 for cam_name in self.camera_names:
-                    image_hdf5_dict[cam_name] = root[f'/observations/images/{cam_name}']
+                    image_hdf5_dict[cam_name] = root[f'/obs/{cam_name}']
                 for cam_name in image_dict.keys():
                     image_one_cam = []
                     for i_img in range(image_hdf5_dict[cam_name].shape[0]):
@@ -119,7 +122,7 @@ class HDF5Dataset(torch.utils.data.Dataset):
         qpos_chunking = self.qpos[clip_index][image_index]
 
         # cam_name = "0"
-        cam_name = "camera_high"
+        cam_name = "agetntview_rgb"
         image_chunking = self.image_dict[cam_name][clip_index][image_index:image_index + window_size]
         image_vla = Image.fromarray(np.transpose(image_chunking[extra_frame_num].cpu().numpy().astype(np.uint8), (1, 2, 0)))
         image_vla = self.color_aug(image_vla)
@@ -262,11 +265,10 @@ def get_norm_stats(dataset_paths, other_config=()):
     all_action_data = []
     for dataset_path in dataset_paths:
         #dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
+        # TODO: Use demo_* to get data
         with h5py.File(dataset_path, 'r') as root:
-            qpos = root['/observations/qpos'][()]
-            if 'qvel' in other_config:
-                qvel = root['/observations/qvel'][()]
-            action = root['/action'][()]
+            qpos = root['/obs/joint_states'][()]
+            action = root['/actions'][()]
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
 
