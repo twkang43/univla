@@ -116,7 +116,7 @@ class FinetuneConfig:
     vla_path: str = "/media/user/9c63fdf2-6bf4-46b1-a472-7376010f52a8/checkpoints/univla/univla-7b"            # Path to your local UniVLA path
     lam_path: str = "/media/user/9c63fdf2-6bf4-46b1-a472-7376010f52a8/checkpoints/univla/latent-action-model/lam-stage-2.ckpt"
     dataset_name: str = "part_instruct"                                    # Name of fine-tuning dataset (e.g., `droid_wipe`)
-    data_file_num: int = 11                                         # Number of data files to load (for debugging, set to 1 or 2)
+    data_file_num: int = 1                                         # Number of data files to load (for debugging, set to 1 or 2)
     run_root_dir: Path = Path("runs")                               # Path to directory to store logs & checkpoints
     adapter_tmp_dir: Path = Path("adapter-tmp")                     # Temporary directory for LoRA weights before fusing
 
@@ -140,7 +140,7 @@ class FinetuneConfig:
     lam_enc_blocks: int = 12
     lam_dec_blocks: int = 12
     lam_num_heads: int = 12
-    window_size: int = 12
+    window_size: int = 20                                           # PartInstruct control frequency = 20Hz
 
 
     freeze_vla: bool = False
@@ -334,9 +334,9 @@ def finetune(cfg: FinetuneConfig) -> None:
 
                     with torch.no_grad():
                         video = torch.stack([batch["initial_pixel_values"], batch["target_pixel_values"]], dim=1)
-                        latent_action_idx_batch = latent_action_model.module.vq_encode(video)['indices'].squeeze()
+                        latent_action_idx_batch = torch.atleast_2d(latent_action_model.module.vq_encode(video)["indices"])
                         video = torch.stack([batch["initial_pixel_values_hist"], batch["target_pixel_values_hist"]], dim=1)
-                        latent_action_idx_history = latent_action_model.module.vq_encode(video)['indices'].squeeze()
+                        latent_action_idx_history = torch.atleast_2d(latent_action_model.module.vq_encode(video)["indices"])
 
                     input_ids_list = []
                     labels_list = []
@@ -386,7 +386,7 @@ def finetune(cfg: FinetuneConfig) -> None:
                 else:
                     with torch.no_grad():
                         video = torch.stack([batch["initial_pixel_values"], batch["target_pixel_values"]], dim=1)
-                        latent_action_idx_batch = latent_action_model.module.vq_encode(video)['indices'].squeeze()
+                        latent_action_idx_batch =  torch.atleast_2d(latent_action_model.module.vq_encode(video)["indices"])
 
                     input_ids_list = []
                     labels_list = []

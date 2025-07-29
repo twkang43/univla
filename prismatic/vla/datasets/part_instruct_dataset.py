@@ -290,8 +290,7 @@ def load_data_univla(dataset_paths, camera_names, batch_size_train, action_token
         pin_memory=False, 
         num_workers=8, 
         prefetch_factor=2, 
-        collate_fn=collator, 
-        drop_last=True
+        collate_fn=collator
     )
 
 
