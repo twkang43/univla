@@ -99,7 +99,7 @@ class Wrapped_Model(torch.nn.Module):
             latent_action_tokens.append(per_sample_latent_action_tokens)
         latent_action_tokens = torch.stack(latent_action_tokens).to(torch.float)
 
-        pred_action = self.action_decoder(latent_action_tokens, visual_embed).reshape(-1, self.window_size, 7)
+        pred_action = self.action_decoder(latent_action_tokens, visual_embed, batch['proprio']).reshape(-1, self.window_size, 7)
         loss = torch.nn.functional.l1_loss(pred_action, batch['actions'], reduction='none')
         loss_one_step = loss[:,0].mean()
         loss = loss.mean()
@@ -116,6 +116,7 @@ class FinetuneConfig:
     vla_path: str = "/media/user/9c63fdf2-6bf4-46b1-a472-7376010f52a8/checkpoints/univla/univla-7b"            # Path to your local UniVLA path
     lam_path: str = "/media/user/9c63fdf2-6bf4-46b1-a472-7376010f52a8/checkpoints/univla/latent-action-model/lam-stage-2.ckpt"
     dataset_name: str = "part_instruct"                                    # Name of fine-tuning dataset (e.g., `droid_wipe`)
+    data_file_num: int = 11                                         # Number of data files to load (for debugging, set to 1 or 2)
     run_root_dir: Path = Path("runs")                               # Path to directory to store logs & checkpoints
     adapter_tmp_dir: Path = Path("adapter-tmp")                     # Temporary directory for LoRA weights before fusing
 
@@ -281,7 +282,7 @@ def finetune(cfg: FinetuneConfig) -> None:
     latent_action_model = latent_action_model.to(device_id).eval()
     
     
-    dataset_paths = find_all_hdf5(cfg.data_root_dir)
+    dataset_paths = find_all_hdf5(cfg.data_root_dir, cfg.data_file_num)
     dataloader, stats = load_data_univla(
         dataset_paths, [cfg.camera_names], cfg.batch_size, action_tokenizer, processor, window_size=cfg.window_size , min_window_size=cfg.window_size,
         max_window_size=cfg.window_size , image_transform = processor.image_processor.apply_transform)
@@ -323,7 +324,7 @@ def finetune(cfg: FinetuneConfig) -> None:
                 batch["target_pixel_values"] = batch["target_pixel_values"].to(device_id)
                 batch["pixel_values"] = batch["pixel_values"].to(torch.bfloat16).to(device_id)
                 batch['actions'] = batch['actions'].to(device_id)
-                batch['proprio'] = batch['proprio'].to(device_id)
+                batch['proprio'] = batch['proprio'].to(torch.bfloat16).to(device_id)
 
                 ### [TODO] We construct latent action labels (also history latent actions) on-the-fly
                 ### This is a work-round of potential CUDA conflict of calling models in dataloader
