@@ -38,6 +38,7 @@ class HDF5Dataset(torch.utils.data.Dataset):
                 window_size = 16,
                 min_window_size = 16,
                 max_window_size = 16,
+                n_demos_per_data=None,
                 image_transform = None,
                 other_config=()) -> None:
         
@@ -56,14 +57,14 @@ class HDF5Dataset(torch.utils.data.Dataset):
         self.image_transform_lam = torchvision.transforms.ToTensor()
         self.image_transform = image_transform
         self.episode_lens = []
-        self.image_dict, self.qpos, self.action, self.tasks_embedding = self.load_all_episodes(dataset_dir)
+        self.image_dict, self.qpos, self.action, self.tasks_embedding = self.load_all_episodes(dataset_dir, n_demos_per_data)
         self.color_aug = torchvision.transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05)
 
 
     def __len__(self):
         return len(self.action)
 
-    def load_all_episodes(self, dataset_paths):
+    def load_all_episodes(self, dataset_paths, n_demos_per_data=None):
         image_dict = dict()
         for cam_name in self.camera_names:
             image_dict[cam_name] = []
@@ -85,8 +86,11 @@ class HDF5Dataset(torch.utils.data.Dataset):
                     # Some files have demos, some are single episodes.
                     # If no 'demo_xx' keys, treat the file as a single episode.
                     demo_keys = [k for k in data_group.keys() if k.startswith('demo_')]
+                    
                     if not demo_keys:
                         demo_keys = [None] # Use None as a placeholder key for single-episode files
+                    elif (n_demos_per_data is not None) and (0 < n_demos_per_data): # TODO: revise data truncation logic
+                        demo_keys = demo_keys[:n_demos_per_data]
 
                     for demo_key in tqdm(demo_keys, desc=f"Loading {dataset_path}", leave=False):
                         episode_group = data_group[demo_key] if demo_key else data_group
@@ -264,7 +268,7 @@ class PaddedCollatorForActionPrediction:
 
 
 def load_data_univla(dataset_paths, camera_names, batch_size_train, action_tokenizer, processor, window_size,     
-        min_window_size, max_window_size, image_transform, other_info=()):
+        min_window_size, max_window_size, n_demos_per_data, image_transform, other_info=()):
 
     num_episodes = len(dataset_paths)
     shuffled_indices = np.random.permutation(num_episodes)
@@ -277,6 +281,7 @@ def load_data_univla(dataset_paths, camera_names, batch_size_train, action_token
         window_size = window_size,
         min_window_size = min_window_size,
         max_window_size = max_window_size,
+        n_demos_per_data = n_demos_per_data,
         image_transform = image_transform,
     )
 
@@ -297,7 +302,7 @@ def load_data_univla(dataset_paths, camera_names, batch_size_train, action_token
     return train_dataloader, norm_stats
 
 
-def find_all_hdf5(dataset_dir, data_file_num, skip_mirrored_data=True):
+def find_all_hdf5(dataset_dir, n_data, skip_mirrored_data=True):
     hdf5_files = []
     for root, dirs, files in os.walk(dataset_dir):
         for filename in fnmatch.filter(files, '*.hdf5'):
@@ -306,7 +311,7 @@ def find_all_hdf5(dataset_dir, data_file_num, skip_mirrored_data=True):
                 continue
             hdf5_files.append(os.path.join(root, filename))
     print(f'Found {len(hdf5_files)} hdf5 files')
-    return hdf5_files[:data_file_num]
+    return hdf5_files[:n_data]
 
 def get_norm_stats(dataset_paths, other_config=()):
     all_qpos_data = []

@@ -8,6 +8,9 @@
 vla_log/
 logs/
 wandb/
+
+adapter-tmp/
+part-instruct-log/
 # C extensions
 *.so
 
