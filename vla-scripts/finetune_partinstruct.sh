@@ -8,6 +8,8 @@ torchrun --standalone --nnodes ${NNODES} --nproc-per-node ${GPUS_PER_NODE} finet
   --batch_size 4 \
   --grad_accumulation_steps 2 \
   --max_steps 10000 \
-  --save_steps 2500 \
+  --save_steps 1000 \
   --window_size 20 \
+  --n_data 11 \
+  --n_demos_per_data 10 \
   --run_root_dir "./part-instruct-log"

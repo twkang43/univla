@@ -111,12 +111,13 @@ class Wrapped_Model(torch.nn.Module):
 @dataclass
 class FinetuneConfig:
     # Directory Paths
-    data_root_dir: Path = Path("/media/user/9c63fdf2-6bf4-46b1-a472-7376010f52a8/dataset/partinstruct")     # Path to Open-X dataset directory
+    data_root_dir: Path = Path("/mnt/disk1/dataset/partinstruct")     # Path to Open-X dataset directory
 
-    vla_path: str = "/media/user/9c63fdf2-6bf4-46b1-a472-7376010f52a8/checkpoints/univla/univla-7b"            # Path to your local UniVLA path
-    lam_path: str = "/media/user/9c63fdf2-6bf4-46b1-a472-7376010f52a8/checkpoints/univla/latent-action-model/lam-stage-2.ckpt"
+    vla_path: str = "/mnt/disk1/checkpoints/univla/univla-7b"            # Path to your local UniVLA path
+    lam_path: str = "/mnt/disk1/checkpoints/univla/latent-action-model/lam-stage-2.ckpt"
     dataset_name: str = "part_instruct"                                    # Name of fine-tuning dataset (e.g., `droid_wipe`)
-    data_file_num: int = 1                                         # Number of data files to load (for debugging, set to 1 or 2)
+    n_data: int = 11                                                # Number of data files to load (for debugging, set to 1 or 2)
+    n_demos_per_data: int = 100                                     # Number of demos to load per data file (0 for all)
     run_root_dir: Path = Path("runs")                               # Path to directory to store logs & checkpoints
     adapter_tmp_dir: Path = Path("adapter-tmp")                     # Temporary directory for LoRA weights before fusing
 
@@ -282,10 +283,10 @@ def finetune(cfg: FinetuneConfig) -> None:
     latent_action_model = latent_action_model.to(device_id).eval()
     
     
-    dataset_paths = find_all_hdf5(cfg.data_root_dir, cfg.data_file_num)
+    dataset_paths = find_all_hdf5(cfg.data_root_dir, cfg.n_data)
     dataloader, stats = load_data_univla(
         dataset_paths, [cfg.camera_names], cfg.batch_size, action_tokenizer, processor, window_size=cfg.window_size , min_window_size=cfg.window_size,
-        max_window_size=cfg.window_size , image_transform = processor.image_processor.apply_transform)
+        max_window_size=cfg.window_size , n_demos_per_data=cfg.n_demos_per_data, image_transform = processor.image_processor.apply_transform)
 
     # save stats and key information
     stats_dir = os.path.join(cfg.data_root_dir, 'stats')
